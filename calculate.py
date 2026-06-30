@@ -6,7 +6,7 @@ import sqlite3
 import hashlib
 import warnings
 
-# ปิดการแจ้งเตือนเรื่องเวอร์ชันของโมเดล
+# ปิดการแจ้งเตือนเรื่องเวอร์ชันของโมเดล (InconsistentVersionWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # ตั้งค่าหน้าเว็บให้ดูทันสมัยและกว้างเต็มตา
@@ -42,7 +42,7 @@ init_db()
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# 🎨 Custom CSS ตกแต่งแนว AgriTech ทันสมัย
+# 🎨 Custom CSS ตกแต่งแนว AgriTech ทันสมัย โทนเขียว-ทอง-มืด
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
@@ -116,12 +116,28 @@ if not st.session_state.logged_in:
 # 🌾 ส่วนที่ 2: ระบบงานหลัก (เมื่อ Login สำเร็จ)
 # ==========================================
 else:
-    # ฟังก์ชันโหลดโมเดล AI
     @st.cache_resource
     def load_multi_crop_models():
         try:
-            model = joblib.load('multi_crop_xgb_model.pkl')
+            import os
+            # โดดข้ามปัญหาระหว่างเวอร์ชันด้วยการเซฟและสร้างฟอร์แมตใหม่ชั่วคราวบนเครื่อง
+            raw_model_path = 'multi_crop_xgb_model.pkl'
+            patched_model_path = 'multi_crop_xgb_model_patched.json'
             scaler = joblib.load('multi_crop_scaler.pkl')
+            
+            # ถ้ายังไม่เคยสร้างไฟล์ตัวแปลงฟอร์แมตเวอร์ชันเครื่องนี้ ให้สร้างก่อน
+            if not os.path.exists(patched_model_path):
+                raw_model = joblib.load(raw_model_path)
+                if hasattr(raw_model, "save_model"):
+                    raw_model.save_model(patched_model_path)
+                else:
+                    raw_model._Booster.save_model(patched_model_path)
+            
+            # โหลดตัวสมองกลผ่านฟอร์แมตสากล (JSON) เข้าสู่ออบเจกต์ของเวอร์ชันปัจจุบันของคุณ
+            import xgboost as xgb
+            model = xgb.XGBRegressor()
+            model.load_model(patched_model_path)
+            
             return model, scaler
         except Exception as e:
             st.error(f"⚠️ ไม่พบไฟล์โมเดลพืช 5 ชนิด กรุณาตรวจสอบไฟล์ในโฟลเดอร์เดียวกัน: {e}")
@@ -129,7 +145,7 @@ else:
 
     model, scaler = load_multi_crop_models()
 
-    # ส่วนหัวบนสุดของ Dashboard
+    # ส่วนหัวด้านบนสุดของ Smart Dashboard
     header_col1, header_col2 = st.columns([8, 2])
     with header_col1:
         st.markdown("<h1 style='color: #38ef7d; font-weight: 600; margin:0;'>🚜 AgriTech Smart Dashboard</h1>", unsafe_allow_html=True)
@@ -141,10 +157,10 @@ else:
 
     st.divider()
 
-    # 🔥 แบ่งระบบเป็น 2 แท็บ (Tabs) แยกจากกันชัดเจน
+    # 📊 สร้างแท็บเมนูแยกออกจากกันเพื่อความเป็นระเบียบ
     tab1, tab2 = st.tabs(["🔮 พยากรณ์ผลผลิตด้วย AI", "🏗️ คำนวณโครงสร้างและโรงเรือน"])
 
-    # ---------------- TAB 1: ระบบพยากรณ์ ----------------
+    # ---------------- TAB 1: ระบบพยากรณ์ผลผลิตด้วย AI ----------------
     with tab1:
         main_col1, main_col2 = st.columns([5, 5], gap="large")
 
@@ -165,6 +181,7 @@ else:
             st.markdown("<h3 style='color: #11998e; margin-bottom: 15px;'>📋 ผลการวิเคราะห์จาก AI</h3>", unsafe_allow_html=True)
             
             if model is not None and scaler is not None:
+                # บังคับชื่อคอลัมน์และลำดับฟีเจอร์ให้ตรงตามโมเดล 5 ชนิดที่ใช้เทรน
                 feature_names = ['Crop_Type', 'Soil_Type', 'Water_Liters_per_Rai', 'Fertilizer_KG_per_Rai', 'Cultivation_Duration_Months']
                 
                 input_data = pd.DataFrame([{
@@ -178,8 +195,9 @@ else:
                 input_scaled = scaler.transform(input_data)
                 prediction = model.predict(input_scaled)
                 
-                pred_quality = prediction[0][0]
-                pred_yield = prediction[0][1]
+                # ดึงข้อมูลออกมาแสดงผลแบบค่าปกติ (Native Types)
+                pred_quality = prediction[0][0].item() if hasattr(prediction[0][0], "item") else prediction[0][0]
+                pred_yield = prediction[0][1].item() if hasattr(prediction[0][1], "item") else prediction[0][1]
                 
                 crop_id = crop_opt[c_choice]
                 quality_unit = "หน่วย CCS" if crop_id == 0 else "% ปริมาณแป้ง" if crop_id == 2 else "คะแนนเกรดคุณภาพ"
@@ -197,59 +215,61 @@ else:
                         <p style='font-size: 38px; font-weight: bold; margin: 10px 0; color: #f1c40f;'>{pred_yield:.2f} <span style='font-size: 18px;'>ตัน / ไร่</span></p>
                     </div>
                 """, unsafe_allow_html=True)
+                
+                st.write("")
+                meta_col1, meta_col2 = st.columns(2)
+                meta_col1.metric(label="ประมาณการดัชนีคุณภาพ", value=f"{pred_quality:.2f}")
+                meta_col2.metric(label="ประมาณการผลผลิตต่อไร่", value=f"{pred_yield:.2f} ตัน")
             else:
-                st.info("💡 ระบบกำลังโหลดไฟล์โมเดล...")
+                st.info("💡 กำลังรอการเชื่อมต่อสมองกล AI...")
 
-    # ---------------- TAB 2: ระบบคำนวณโรงเรือน ----------------
+    # ---------------- TAB 2: ระบบคำนวณต้นทุนโครงสร้างโรงเรือน ----------------
     with tab2:
         calc_col1, calc_col2 = st.columns([5, 5], gap="large")
         
         with calc_col1:
-            st.markdown("<h3 style='color: #11998e; margin-bottom: 15px;'>📐 ระบุขนาดและวัสดุโรงเรือน</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color: #11998e; margin-bottom: 15px;'>📐 ระบุขนาดและประเภทวัสดุ</h3>", unsafe_allow_html=True)
             
-            # รับขนาดพื้นที่โรงเรือน
             width = st.number_input("📏 ความกว้างของโรงเรือน (เมตร)", min_value=1.0, max_value=50.0, value=6.0, step=0.5)
             length = st.number_input("📏 ความยาวของโรงเรือน (เมตร)", min_value=1.0, max_value=100.0, value=12.0, step=1.0)
             
-            # เลือกเกรดวัสดุโครงสร้าง
+            # แมปราคาเฉลี่ยรวมค่าแรงต่อตารางเมตรแยกตามประเภทโรงเรือน
             material_prices = {
-                "Standard (โครงเหล็กทั่วไป + มุ้งขาวกันแมลง)": 250,
-                "Premium (โครงเหล็กกัลวาไนซ์กันสนิม + พลาสติก UV หนาพิเศษ)": 450,
-                "Smart Smart Greenhouse (โครงพรีเมียม + ระบบพ่นหมอกและเซนเซอร์อัตโนมัติ)": 850
+                "Standard (โครงเหล็กประปาทั่วไป + มุ้งขาวกันแมลงรอบทิศ)": 250,
+                "Premium (โครงกัลวาไนซ์กันสนิมอย่างดี + หลังคาพลาสติกกัน UV หนาพิเศษ)": 450,
+                "Smart Greenhouse (ระบบโครงสร้างพรีเมียม + ชุดพ่นหมอกและเซนเซอร์อัตโนมัติ)": 850
             }
-            material_choice = st.selectbox("🏗️ เลือกประเภทและวัสดุโครงสร้าง", list(material_prices.keys()))
+            material_choice = st.selectbox("🏗️ เลือกประเภทและเกรดวัสดุโครงสร้าง", list(material_prices.keys()))
             
         with calc_col2:
             st.markdown("<h3 style='color: #11998e; margin-bottom: 15px;'>💰 ประมาณการค่าใช้จ่ายและวัสดุ</h3>", unsafe_allow_html=True)
             
-            # คำนวณพื้นที่และราคาต้นทุนเบื้องต้น
             area = width * length
             price_per_sqm = material_prices[material_choice]
             total_cost = area * price_per_sqm
             
-            # ประมาณการวัสดุพื้นฐานคราวๆ (Logic ยืดหยุ่นปรับได้)
-            estimated_poles = int((length / 2) * 2 + 2) # เสาทุกๆ 2 เมตร สองฝั่ง
+            # สูตรประเมินเสาหลัก (สมมติเสาห่างกันทุกๆ 2 เมตร สองฝั่งซ้ายขวา)
+            estimated_poles = int((length / 2) * 2 + 2)
             
             st.markdown(f"""
                 <div class='result-card' style='background: linear-gradient(135deg, #2c3e50, #3498db);'>
-                    <h4 style='margin: 0;'>📐 พื้นที่ใช้สอยทั้งหมด</h4>
+                    <h4 style='margin: 0;'>📐 ขนาดพื้นที่โรงเรือนทั้งหมด</h4>
                     <p style='font-size: 34px; font-weight: bold; margin: 10px 0; color: #ecf0f1;'>{area:.2f} <span style='font-size: 18px;'>ตารางเมตร</span></p>
                 </div>
             """, unsafe_allow_html=True)
             
             st.markdown(f"""
                 <div class='result-card' style='background: linear-gradient(135deg, #27ae60, #2ecc71);'>
-                    <h4 style='margin: 0;'>💵 ประมาณการงบประมาณค่าก่อสร้างรวม</h4>
+                    <h4 style='margin: 0;'>💵 ประมาณการงบประมาณค่าใช้จ่ายวัสดุรวม</h4>
                     <p style='font-size: 34px; font-weight: bold; margin: 10px 0; color: #fff;'>{total_cost:,.2f} <span style='font-size: 18px;'>บาท</span></p>
-                    <small style='color: #eaeded;'>*คำนวณจากราคาเฉลี่ย {price_per_sqm} บาท / ตร.ม.</small>
+                    <small style='color: #eaeded;'>*คำนวณจากราคาวัสดุเริ่มต้นเฉลี่ยประมาณ {price_per_sqm} บาท / ตร.ม.</small>
                 </div>
             """, unsafe_allow_html=True)
             
-            # แสดงรายการแจกแจงวัสดุคร่าวๆ
             st.write("")
-            st.markdown("##### 📋 รายการวัสดุโครงสร้างพื้นฐานโดยประมาณ")
+            st.markdown("##### 📋 รายการประมาณการพัสดุโครงสร้างเบื้องต้น")
             item_df = pd.DataFrame({
-                "รายการวัสดุ": ["พื้นที่พลาสติกคลุมหลังคา / มุ้ง", "เสาโครงสร้างหลัก (ระยะทุก 2 เมตร)", "ราคาประเมินค่าวัสดุและค่าแรงเริ่มต้น"],
+                "รายการพัสดุ": ["พื้นที่ผืนพลาสติกคลุมหลังคา / มุ้งลวด", "จำนวนเสาโครงสร้างหลัก (ระยะติดตั้งทุก 2 เมตร)", "ราคาประเมินวัสดุอุปกรณ์รวมขั้นต่ำ"],
                 "ปริมาณโดยประมาณ": [f"{area:.2f} ตร.ม.", f"อย่างน้อย {estimated_poles} ต้น", f"{total_cost:,.2f} บาท"]
             })
             st.dataframe(item_df, use_container_width=True, hide_index=True)
