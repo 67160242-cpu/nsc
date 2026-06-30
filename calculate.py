@@ -45,7 +45,7 @@ if "logged_in" not in st.session_state:
 # 🎨 Custom CSS ตกแต่งแนว AgriTech ทันสมัย
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght=300;400;600&display=swap');
     html, body, [class*="css"]  { font-family: 'Sarabun', sans-serif; }
     div[data-testid="stNumberInput"], div[data-testid="stSelectbox"] {
         background-color: #1e222b; padding: 10px; border-radius: 12px;
@@ -172,9 +172,9 @@ else:
             input_scaled = scaler.transform(input_data)
             prediction = model.predict(input_scaled)
             
-            # [แก้ไขแล้ว] แปลงค่าผลลัพธ์เป็นตัวเลขเดี่ยว (Scalar) ด้วย .item() เพื่อป้องกัน Error บน st.metric
-            pred_quality = prediction[0][0].item()
-            pred_yield = prediction[0][1].item()
+            # [แก้ไขจุดบั๊ก] เปลี่ยนจากดึงแบบ 2 มิติ (prediction[0][0]) เป็นแบบ 1 มิติ (prediction[0])
+            pred_quality = prediction[0].item()
+            pred_yield = prediction[1].item()
             
             crop_id = crop_opt[c_choice]
             quality_unit = "หน่วย CCS" if crop_id == 0 else "% ปริมาณแป้ง" if crop_id == 2 else "คะแนนเกรดคุณภาพ"
