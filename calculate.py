@@ -4,6 +4,10 @@ import numpy as np
 import joblib
 import sqlite3
 import hashlib
+import warnings
+
+# ปิดการแจ้งเตือนเรื่องเวอร์ชันของโมเดลไม่ตรงกัน (InconsistentVersionWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 # ตั้งค่าหน้าเว็บให้ดูทันสมัยและกว้างเต็มตา
 st.set_page_config(
@@ -168,8 +172,9 @@ else:
             input_scaled = scaler.transform(input_data)
             prediction = model.predict(input_scaled)
             
-            pred_quality = prediction[0][0]
-            pred_yield = prediction[0][1]
+            # [แก้ไขแล้ว] แปลงค่าผลลัพธ์เป็นตัวเลขเดี่ยว (Scalar) ด้วย .item() เพื่อป้องกัน Error บน st.metric
+            pred_quality = prediction[0][0].item()
+            pred_yield = prediction[0][1].item()
             
             crop_id = crop_opt[c_choice]
             quality_unit = "หน่วย CCS" if crop_id == 0 else "% ปริมาณแป้ง" if crop_id == 2 else "คะแนนเกรดคุณภาพ"
