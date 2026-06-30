@@ -172,9 +172,9 @@ else:
             input_scaled = scaler.transform(input_data)
             prediction = model.predict(input_scaled)
             
-            # [แก้ไขจุดบั๊ก] เปลี่ยนจากดึงแบบ 2 มิติ (prediction[0][0]) เป็นแบบ 1 มิติ (prediction[0])
-            pred_quality = prediction[0].item()
-            pred_yield = prediction[1].item()
+            # [แก้ไขสมบูรณ์] ดึงค่าแถวแรก [0] แล้วเจาะจงคอลัมน์ [0] และ [1] เพื่อแยกค่าพยากรณ์ทั้งสองตัว
+            pred_quality = prediction[0][0].item()
+            pred_yield = prediction[0][1].item()
             
             crop_id = crop_opt[c_choice]
             quality_unit = "หน่วย CCS" if crop_id == 0 else "% ปริมาณแป้ง" if crop_id == 2 else "คะแนนเกรดคุณภาพ"
