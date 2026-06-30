@@ -6,7 +6,7 @@ import sqlite3
 import hashlib
 import warnings
 
-# ปิดการแจ้งเตือนเรื่องเวอร์ชันของโมเดลไม่ตรงกัน (InconsistentVersionWarning)
+# ปิดการแจ้งเตือนเรื่องเวอร์ชันของโมเดล (InconsistentVersionWarning) ไม่ต้องแก้เวอร์ชันแล้ว
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # ตั้งค่าหน้าเว็บให้ดูทันสมัยและกว้างเต็มตา
@@ -172,7 +172,7 @@ else:
             input_scaled = scaler.transform(input_data)
             prediction = model.predict(input_scaled)
             
-            # [แก้ไขสมบูรณ์] ดึงค่าแถวแรก [0] แล้วเจาะจงคอลัมน์ [0] และ [1] เพื่อแยกค่าพยากรณ์ทั้งสองตัว
+            # เจาะเข้าแถวแรก [0] และเลือกคอลัมน์ให้ถูกตามโครงสร้างโมเดลตัวเดิมเป๊ะๆ
             pred_quality = prediction[0][0].item()
             pred_yield = prediction[0][1].item()
             
