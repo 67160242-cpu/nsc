@@ -1,0 +1,9 @@
+users.db
+
+# ไม่เอาไฟล์ Patch โมเดลที่ระบบสร้างขึ้นชั่วคราวขึ้น Git
+multi_crop_xgb_model_patched.json
+
+# (เพิ่มเติม) เคลียร์ไฟล์ขยะของ Python และ Streamlit
+__pycache__/
+.streamlit/
+.DS_Store
